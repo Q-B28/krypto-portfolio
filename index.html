@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-    .container { max-width: 1050px; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     h1 { color: #10b981; margin-bottom: 24px; }
     
     .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
@@ -107,6 +107,8 @@
                 <th>Kaufpreis</th>
                 <th>Gebühren</th>
                 <th>Gesamtkosten</th>
+                <th>Aktueller Wert</th>
+                <th>Gewinn / Verlust</th>
                 <th>Aktion</th>
               </tr>
             </thead>
@@ -260,7 +262,17 @@
 
       if (error || !portfolio) return;
 
-      // 1. Historie aufbauen
+      // 1. Live-Preise von CoinGecko abrufen
+      const ids = [...new Set(portfolio.map(item => item.coin_id))].join(',');
+      let prices = {};
+      if (ids) {
+        try {
+          const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=chf`);
+          if (res.ok) prices = await res.json();
+        } catch (e) { console.error(e); }
+      }
+
+      // 2. Historie-Tabelle aufbauen (inkl. Gewinn/Verlust pro Tranche)
       const historyTable = document.getElementById('historyTable');
       historyTable.innerHTML = '';
       
@@ -270,6 +282,12 @@
         const totalCost = netBuyPrice + itemFee;
         const formattedDate = item.buy_date ? new Date(item.buy_date).toLocaleDateString('de-CH') : '-';
 
+        // Berechnung für diese spezifische Transaktion
+        const currentPrice = prices[item.coin_id]?.chf || 0;
+        const itemCurrentValue = currentPrice * item.amount;
+        const itemProfitLoss = itemCurrentValue - totalCost;
+        const itemProfitPercent = totalCost > 0 ? (itemProfitLoss / totalCost) * 100 : 0;
+
         historyTable.innerHTML += `
           <tr>
             <td>${formattedDate}</td>
@@ -278,20 +296,14 @@
             <td>${netBuyPrice.toFixed(2)} CHF</td>
             <td>${itemFee.toFixed(2)} CHF</td>
             <td><b>${totalCost.toFixed(2)} CHF</b></td>
+            <td>${currentPrice ? itemCurrentValue.toFixed(2) + ' CHF' : 'N/A'}</td>
+            <td class="${itemProfitLoss >= 0 ? 'positive' : 'negative'}">
+              ${currentPrice ? `${itemProfitLoss >= 0 ? '+' : ''}${itemProfitLoss.toFixed(2)} CHF (${itemProfitPercent.toFixed(2)}%)` : 'N/A'}
+            </td>
             <td><button class="delete-btn" onclick="deleteAsset('${item.id}')">Löschen</button></td>
           </tr>
         `;
       });
-
-      // 2. Live-Preise abrufen
-      const ids = [...new Set(portfolio.map(item => item.coin_id))].join(',');
-      let prices = {};
-      if (ids) {
-        try {
-          const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=chf`);
-          if (res.ok) prices = await res.json();
-        } catch (e) { console.error(e); }
-      }
 
       // 3. Portfolio-Aggregation
       const summaryMap = {};
