@@ -55,6 +55,7 @@
   <div class="container">
     <h1>Krypto Portfolio Tracker</h1>
 
+    <!-- Gesamtübersicht -->
     <div class="summary-grid">
       <div class="stat-card">
         <h4>Gesamtwert</h4>
@@ -70,11 +71,13 @@
       </div>
     </div>
 
+    <!-- Navigation Tabs -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('historyTab', this)">Historie & Eingabe</button>
       <button class="tab-btn" onclick="switchTab('summaryTab', this)">Portfolio Zusammenfassung</button>
     </div>
 
+    <!-- SEITE 1: Eingabe & Historie -->
     <div id="historyTab" class="tab-content active">
       <div class="card">
         <h3>Kauf hinzufügen</h3>
@@ -86,7 +89,7 @@
           </div>
           <input type="number" step="any" id="amount" placeholder="Menge (z.B. 0.0063)">
           <input type="number" step="any" id="totalBuyPrice" placeholder="Kaufpreis netto (CHF)">
-          <input type="number" step="any" id="fee" placeholder="Gebühren (CHF)" value="0">
+          <input type="number" step="any" id="fee" placeholder="Gebühren (CHF)">
           <input type="date" id="buyDate">
           <button onclick="addAsset()">Speichern</button>
         </div>
@@ -113,6 +116,7 @@
       </div>
     </div>
 
+    <!-- SEITE 2: Zusammenfassung -->
     <div id="summaryTab" class="tab-content">
       <div class="card">
         <h3>Portfolio Übersicht (Zusammengefasst)</h3>
@@ -237,7 +241,7 @@
         document.getElementById('selectedCoinId').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('totalBuyPrice').value = '';
-        document.getElementById('fee').value = '0';
+        document.getElementById('fee').value = '';
         document.getElementById('buyDate').valueAsDate = new Date();
         loadPortfolio();
       }
@@ -289,7 +293,7 @@
         } catch (e) { console.error(e); }
       }
 
-      // 3. Portfolio-Aggregation (Gebühren fließen voll in die Gesamtinvestition ein)
+      // 3. Portfolio-Aggregation
       const summaryMap = {};
       let totalCurrentSum = 0;
       let totalInvestedSum = 0;
