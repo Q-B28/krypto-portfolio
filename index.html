@@ -7,10 +7,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-    .container { max-width: 1000px; margin: 0 auto; }
+    .container { max-width: 1050px; margin: 0 auto; }
     h1 { color: #10b981; margin-bottom: 24px; }
     
-    /* Navigation Tabs */
     .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
     .tab-btn { background: #1e293b; color: #94a3b8; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; transition: all 0.2s; }
     .tab-btn.active { background: #10b981; color: #fff; }
@@ -26,7 +25,7 @@
     .stat-card .val { font-size: 20px; font-weight: bold; margin-top: 5px; }
 
     .form-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; position: relative; }
-    .search-container { position: relative; flex: 1; min-width: 220px; }
+    .search-container { position: relative; flex: 1; min-width: 200px; }
     input { background: #334155; border: 1px solid #475569; color: #fff; padding: 10px 14px; border-radius: 6px; width: 100%; box-sizing: border-box; font-size: 14px; }
     input[type="date"] { color-scheme: dark; }
     input:focus { outline: 2px solid #10b981; border-color: transparent; }
@@ -56,14 +55,13 @@
   <div class="container">
     <h1>Krypto Portfolio Tracker</h1>
 
-    <!-- Gesamtübersicht (immer sichtbar) -->
     <div class="summary-grid">
       <div class="stat-card">
         <h4>Gesamtwert</h4>
         <div class="val" id="totalValue">0.00 CHF</div>
       </div>
       <div class="stat-card">
-        <h4>Gesamt Investiert</h4>
+        <h4>Gesamt Investiert (inkl. Gebühren)</h4>
         <div class="val" id="totalInvested">0.00 CHF</div>
       </div>
       <div class="stat-card">
@@ -72,24 +70,23 @@
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('historyTab', this)">Historie & Eingabe</button>
       <button class="tab-btn" onclick="switchTab('summaryTab', this)">Portfolio Zusammenfassung</button>
     </div>
 
-    <!-- SEITE 1: Eingabe & Historie -->
     <div id="historyTab" class="tab-content active">
       <div class="card">
         <h3>Kauf hinzufügen</h3>
         <div class="form-group">
           <div class="search-container">
-            <input type="text" id="coinSearch" placeholder="Name oder ID (z.B. bitcoin, kaspa)..." autocomplete="off" oninput="onSearchInput()">
+            <input type="text" id="coinSearch" placeholder="Name oder ID (z.B. bitcoin)..." autocomplete="off" oninput="onSearchInput()">
             <input type="hidden" id="selectedCoinId">
             <div id="searchResults" class="search-results"></div>
           </div>
           <input type="number" step="any" id="amount" placeholder="Menge (z.B. 0.0063)">
-          <input type="number" step="any" id="totalBuyPrice" placeholder="Gesamt-Kaufpreis (CHF)">
+          <input type="number" step="any" id="totalBuyPrice" placeholder="Kaufpreis netto (CHF)">
+          <input type="number" step="any" id="fee" placeholder="Gebühren (CHF)" value="0">
           <input type="date" id="buyDate">
           <button onclick="addAsset()">Speichern</button>
         </div>
@@ -102,10 +99,11 @@
             <thead>
               <tr>
                 <th>Datum</th>
-                <th>Asset (ID)</th>
+                <th>Asset</th>
                 <th>Menge</th>
-                <th>Investiert</th>
-                <th>Kaufpreis / Coin</th>
+                <th>Kaufpreis</th>
+                <th>Gebühren</th>
+                <th>Gesamtkosten</th>
                 <th>Aktion</th>
               </tr>
             </thead>
@@ -115,11 +113,10 @@
       </div>
     </div>
 
-    <!-- SEITE 2: Zusammenfassung & Sortierung -->
     <div id="summaryTab" class="tab-content">
       <div class="card">
         <h3>Portfolio Übersicht (Zusammengefasst)</h3>
-        <p style="color: #94a3b8; font-size: 13px;">Klicke auf die Spaltenköpfe, um die Tabelle nach Wunsch zu sortieren.</p>
+        <p style="color: #94a3b8; font-size: 13px;">Gebühren sind in "Gesamt Investiert" und im "Ø Kaufpreis / Coin" bereits eingerechnet.</p>
         <div class="table-container">
           <table>
             <thead>
@@ -148,7 +145,6 @@
 
     document.getElementById('buyDate').valueAsDate = new Date();
 
-    let rawPortfolioData = [];
     let aggregatedData = [];
     let currentSortColumn = 'currentValue';
     let currentSortDirection = 'desc';
@@ -162,7 +158,6 @@
     }
 
     function onSearchInput() {
-      // Setzt das versteckte ID-Feld zurück, wenn der User manuell tippt
       document.getElementById('selectedCoinId').value = '';
       searchCoins();
     }
@@ -180,8 +175,7 @@
       searchTimeout = setTimeout(async () => {
         try {
           const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`);
-          if (!res.ok) throw new Error("API-Limit erreicht");
-          
+          if (!res.ok) throw new Error("API Limit");
           const data = await res.json();
           resultsDiv.innerHTML = '';
           
@@ -198,7 +192,6 @@
             resultsDiv.style.display = 'none';
           }
         } catch (e) {
-          console.warn("Live-Suche nicht verfügbar, direkte ID-Eingabe aktiv:", e);
           resultsDiv.style.display = 'none';
         }
       }, 300);
@@ -210,7 +203,6 @@
       document.getElementById('searchResults').style.display = 'none';
     }
 
-    // Klick außerhalb schließt die Vorschläge
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.search-container')) {
         document.getElementById('searchResults').style.display = 'none';
@@ -218,14 +210,13 @@
     });
 
     async function addAsset() {
-      // Nutze ausgewählte ID aus der Liste ODER den manuell getippten Text als Coin-ID
       let selectedId = document.getElementById('selectedCoinId').value;
       let rawInput = document.getElementById('coinSearch').value.toLowerCase().trim();
-      
       let coin_id = selectedId ? selectedId : rawInput;
 
       const amount = parseFloat(document.getElementById('amount').value);
       const total_buy_price = parseFloat(document.getElementById('totalBuyPrice').value);
+      const fee = parseFloat(document.getElementById('fee').value) || 0;
       const buy_date = document.getElementById('buyDate').value;
 
       if (!coin_id || isNaN(amount) || isNaN(total_buy_price) || !buy_date) {
@@ -235,16 +226,18 @@
 
       const buy_price = total_buy_price / amount;
 
-      const { error } = await _supabase.from('portfolio').insert([{ coin_id, amount, buy_price, total_buy_price, buy_date }]);
+      const { error } = await _supabase
+        .from('portfolio')
+        .insert([{ coin_id, amount, buy_price, total_buy_price, fee, buy_date }]);
 
       if (error) {
-        console.error("Fehler beim Speichern:", error);
         alert("Fehler beim Speichern in Supabase.");
       } else {
         document.getElementById('coinSearch').value = '';
         document.getElementById('selectedCoinId').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('totalBuyPrice').value = '';
+        document.getElementById('fee').value = '0';
         document.getElementById('buyDate').valueAsDate = new Date();
         loadPortfolio();
       }
@@ -256,22 +249,21 @@
     }
 
     async function loadPortfolio() {
-      // Neueste Transaktionen zuerst
       const { data: portfolio, error } = await _supabase
         .from('portfolio')
         .select('*')
         .order('buy_date', { ascending: false });
 
       if (error || !portfolio) return;
-      rawPortfolioData = portfolio;
 
-      // 1. Historie-Tabelle
+      // 1. Historie aufbauen
       const historyTable = document.getElementById('historyTable');
       historyTable.innerHTML = '';
       
       portfolio.forEach(item => {
-        const invested = item.total_buy_price ? parseFloat(item.total_buy_price) : (item.buy_price * item.amount);
-        const pricePerCoin = item.amount > 0 ? (invested / item.amount) : 0;
+        const netBuyPrice = item.total_buy_price ? parseFloat(item.total_buy_price) : (item.buy_price * item.amount);
+        const itemFee = item.fee ? parseFloat(item.fee) : 0;
+        const totalCost = netBuyPrice + itemFee;
         const formattedDate = item.buy_date ? new Date(item.buy_date).toLocaleDateString('de-CH') : '-';
 
         historyTable.innerHTML += `
@@ -279,41 +271,41 @@
             <td>${formattedDate}</td>
             <td><b>${item.coin_id.toUpperCase()}</b></td>
             <td>${item.amount}</td>
-            <td>${invested.toFixed(2)} CHF</td>
-            <td>${pricePerCoin.toFixed(2)} CHF</td>
+            <td>${netBuyPrice.toFixed(2)} CHF</td>
+            <td>${itemFee.toFixed(2)} CHF</td>
+            <td><b>${totalCost.toFixed(2)} CHF</b></td>
             <td><button class="delete-btn" onclick="deleteAsset('${item.id}')">Löschen</button></td>
           </tr>
         `;
       });
 
-      // 2. Kurse von CoinGecko abrufen
+      // 2. Live-Preise abrufen
       const ids = [...new Set(portfolio.map(item => item.coin_id))].join(',');
       let prices = {};
       if (ids) {
         try {
           const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=chf`);
-          if (res.ok) {
-            prices = await res.json();
-          }
-        } catch (e) { 
-          console.error("Fehler beim Abrufen der Kurse:", e); 
-        }
+          if (res.ok) prices = await res.json();
+        } catch (e) { console.error(e); }
       }
 
-      // 3. Aggregation für Zusammenfassung
+      // 3. Portfolio-Aggregation (Gebühren fließen voll in die Gesamtinvestition ein)
       const summaryMap = {};
       let totalCurrentSum = 0;
       let totalInvestedSum = 0;
 
       portfolio.forEach(item => {
-        const invested = item.total_buy_price ? parseFloat(item.total_buy_price) : (item.buy_price * item.amount);
-        totalInvestedSum += invested;
+        const netBuyPrice = item.total_buy_price ? parseFloat(item.total_buy_price) : (item.buy_price * item.amount);
+        const itemFee = item.fee ? parseFloat(item.fee) : 0;
+        const grossCost = netBuyPrice + itemFee;
+
+        totalInvestedSum += grossCost;
 
         if (!summaryMap[item.coin_id]) {
           summaryMap[item.coin_id] = { coin_id: item.coin_id, amount: 0, investedTotal: 0 };
         }
         summaryMap[item.coin_id].amount += parseFloat(item.amount);
-        summaryMap[item.coin_id].investedTotal += invested;
+        summaryMap[item.coin_id].investedTotal += grossCost;
       });
 
       aggregatedData = Object.values(summaryMap).map(asset => {
@@ -335,7 +327,7 @@
         };
       });
 
-      // Stat-Cards
+      // Stat-Cards aktualisieren
       const totalProfit = totalCurrentSum - totalInvestedSum;
       const totalProfitPercent = totalInvestedSum > 0 ? (totalProfit / totalInvestedSum) * 100 : 0;
 
