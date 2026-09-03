@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mein Krypto Portfolio</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #10b981; margin-bottom: 24px; }
+    .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
+    .form-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    input { background: #334155; border: 1px solid #475569; color: #fff; padding: 10px 14px; border-radius: 6px; flex: 1; min-width: 140px; font-size: 14px; }
+    input:focus { outline: 2px solid #10b981; border-color: transparent; }
+    button { background: #10b981; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #059669; }
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; }
+    th { color: #94a3b8; font-weight: 600; }
+    .positive { color: #34d399; font-weight: bold; }
+    .negative { color: #f87171; font-weight: bold; }
+    .delete-btn { background: #ef4444; padding: 4px 8px; font-size: 12px; }
+    .delete-btn:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Krypto Portfolio Tracker</h1>
+
+    <div class="card">
+      <h3>Kauf hinzufügen</h3>
+      <div class="form-group">
+        <input type="text" id="coinId" placeholder="Coin ID (z.B. bitcoin, ethereum)">
+        <input type="number" step="any" id="amount" placeholder="Menge">
+        <input type="number" step="any" id="buyPrice" placeholder="Kaufpreis (€)">
+        <button onclick="addAsset()">Speichern</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Gesamtwert: <span id="totalValue">0.00</span> €</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th>Menge</th>
+              <th>Kaufpreis</th>
+              <th>Aktuell</th>
+              <th>Wert</th>
+              <th>Gewinn / Verlust</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="portfolioTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Konfiguration
+    const SUPABASE_URL = 'https://pymmoavninjluycfjlur.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5bW1vYXZuaW5qbHV5Y2ZqbHVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDEwODAsImV4cCI6MjEwNDAxNzA4MH0.H9D9gthYNSV-cfFQTd6i9lqo3Pol-XhCWRY18pPcjSs';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function addAsset() {
+      const coin_id = document.getElementById('coinId').value.toLowerCase().trim();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const buy_price = parseFloat(document.getElementById('buyPrice').value);
+
+      if (!coin_id || isNaN(amount) || isNaN(buy_price)) {
+        alert('Bitte alle Felder korrekt ausfüllen.');
+        return;
+      }
+
+      const { error } = await _supabase
+        .from('portfolio')
+        .insert([{ coin_id, amount, buy_price }]);
+
+      if (error) {
+        console.error("Fehler beim Speichern:", error);
+        alert("Fehler beim Speichern in Supabase. Prüfe die Konsole.");
+      } else {
+        document.getElementById('coinId').value = '';
+        document.getElementById('amount').value = '';
+        document.getElementById('buyPrice').value = '';
+        loadPortfolio();
+      }
+    }
+
+    async function deleteAsset(id) {
+      const { error } = await _supabase
+        .from('portfolio')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Fehler beim Löschen:", error);
+      } else {
+        loadPortfolio();
+      }
+    }
+
+    async function loadPortfolio() {
+      const { data: portfolio, error } = await _supabase.from('portfolio').select('*');
+      
+      const tableBody = document.getElementById('portfolioTable');
+      
+      if (error) {
+        console.error("Fehler beim Laden:", error);
+        tableBody.innerHTML = '<tr><td colspan="7">Fehler beim Laden der Daten aus Supabase.</td></tr>';
+        return;
+      }
+
+      if (!portfolio || portfolio.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7">Noch keine Positionen eingetragen.</td></tr>';
+        document.getElementById('totalValue').innerText = '0.00';
+        return;
+      }
+
+      // Einmalige Liste aller Coin-IDs für die API-Abfrage
+      const ids = [...new Set(portfolio.map(item => item.coin_id))].join(',');
+      
+      let prices = {};
+      try {
+        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur`);
+        prices = await response.json();
+      } catch (e) {
+        console.error("Fehler beim Abrufen der Kurse:", e);
+      }
+
+      let totalSum = 0;
+      tableBody.innerHTML = '';
+
+      portfolio.forEach((item) => {
+        const currentPrice = prices[item.coin_id]?.eur || 0;
+        const currentValue = currentPrice * item.amount;
+        const invested = item.buy_price * item.amount;
+        const profitLoss = currentValue - invested;
+        totalSum += currentValue;
+
+        tableBody.innerHTML += `
+          <tr>
+            <td><b>${item.coin_id.toUpperCase()}</b></td>
+            <td>${item.amount}</td>
+            <td>${item.buy_price.toFixed(2)} €</td>
+            <td>${currentPrice ? currentPrice.toFixed(2) + ' €' : 'N/A'}</td>
+            <td>${currentValue.toFixed(2)} €</td>
+            <td class="${profitLoss >= 0 ? 'positive' : 'negative'}">
+              ${profitLoss >= 0 ? '+' : ''}${profitLoss.toFixed(2)} €
+            </td>
+            <td>
+              <button class="delete-btn" onclick="deleteAsset('${item.id}')">Löschen</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      document.getElementById('totalValue').innerText = totalSum.toFixed(2);
+    }
+
+    loadPortfolio();
+  </script>
+</body>
+</html>
