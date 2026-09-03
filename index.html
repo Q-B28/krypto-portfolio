@@ -33,7 +33,30 @@
     <div class="card">
       <h3>Kauf hinzufügen</h3>
       <div class="form-group">
-        <input type="text" id="coinId" placeholder="Coin ID (z.B. bitcoin)">
+        <input type="text" id="coinId" list="coinList" placeholder="Coin suchen (z.B. Bitcoin)">
+        <datalist id="coinList">
+          <option value="bitcoin">Bitcoin (BTC)</option>
+          <option value="ethereum">Ethereum (ETH)</option>
+          <option value="solana">Solana (SOL)</option>
+          <option value="binancecoin">BNB (BNB)</option>
+          <option value="ripple">XRP (XRP)</option>
+          <option value="cardano">Cardano (ADA)</option>
+          <option value="avalanche-2">Avalanche (AVAX)</option>
+          <option value="dogecoin">Dogecoin (DOGE)</option>
+          <option value="polkadot">Polkadot (DOT)</option>
+          <option value="chainlink">Chainlink (LINK)</option>
+          <option value="near">NEAR Protocol (NEAR)</option>
+          <option value="sui">Sui (SUI)</option>
+          <option value="uniswap">Uniswap (UNI)</option>
+          <option value="shiba-inu">Shiba Inu (SHIB)</option>
+          <option value="pepe">Pepe (PEPE)</option>
+          <option value="polygon-ecosystem-token">Polygon (POL)</option>
+          <option value="fetch-ai">Artificial Superintelligence Alliance (FET)</option>
+          <option value="render-token">Render (RENDER)</option>
+          <option value="tether">Tether USD (USDT)</option>
+          <option value="usd-coin">USD Coin (USDC)</option>
+        </datalist>
+
         <input type="number" step="any" id="amount" placeholder="Menge">
         <input type="number" step="any" id="buyPrice" placeholder="Kaufpreis (CHF)">
         <input type="date" id="buyDate">
@@ -113,7 +136,6 @@
     }
 
     async function loadPortfolio() {
-      // Sortieren nach Datum absteigend (neueste Käufe oben)
       const { data: portfolio, error } = await _supabase
         .from('portfolio')
         .select('*')
@@ -153,7 +175,6 @@
         const profitLoss = currentValue - invested;
         totalSum += currentValue;
 
-        // Datum im Format DD.MM.YYYY formatieren
         const formattedDate = item.buy_date ? new Date(item.buy_date).toLocaleDateString('de-CH') : '-';
 
         tableBody.innerHTML += `
