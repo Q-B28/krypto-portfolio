@@ -14,10 +14,18 @@
     .stat-card { background: #1e293b; padding: 15px; border-radius: 10px; border-left: 4px solid #10b981; }
     .stat-card h4 { margin: 0; color: #94a3b8; font-size: 13px; text-transform: uppercase; }
     .stat-card .val { font-size: 20px; font-weight: bold; margin-top: 5px; }
-    .form-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-    input { background: #334155; border: 1px solid #475569; color: #fff; padding: 10px 14px; border-radius: 6px; flex: 1; min-width: 130px; font-size: 14px; }
+    .form-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; position: relative; }
+    .search-container { position: relative; flex: 1; min-width: 200px; }
+    input { background: #334155; border: 1px solid #475569; color: #fff; padding: 10px 14px; border-radius: 6px; width: 100%; box-sizing: border-box; font-size: 14px; }
     input[type="date"] { color-scheme: dark; }
     input:focus { outline: 2px solid #10b981; border-color: transparent; }
+    
+    /* Live-Suchergebnisse Styling */
+    .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; border: 1px solid #475569; border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; margin-top: 4px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); }
+    .search-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; font-size: 14px; }
+    .search-item:hover { background: #334155; color: #10b981; }
+    .search-item .symbol { color: #94a3b8; font-size: 12px; }
+
     button { background: #10b981; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     button:hover { background: #059669; }
     .table-container { overflow-x: auto; }
@@ -34,7 +42,6 @@
   <div class="container">
     <h1>Krypto Portfolio Tracker</h1>
 
-    <!-- Gesamtübersicht -->
     <div class="summary-grid">
       <div class="stat-card">
         <h4>Gesamtwert</h4>
@@ -53,20 +60,12 @@
     <div class="card">
       <h3>Kauf hinzufügen</h3>
       <div class="form-group">
-        <input type="text" id="coinId" list="coinList" placeholder="Coin (z.B. bitcoin)">
-        <datalist id="coinList">
-          <option value="bitcoin">Bitcoin (BTC)</option>
-          <option value="ethereum">Ethereum (ETH)</option>
-          <option value="solana">Solana (SOL)</option>
-          <option value="binancecoin">BNB (BNB)</option>
-          <option value="ripple">XRP (XRP)</option>
-          <option value="cardano">Cardano (ADA)</option>
-          <option value="avalanche-2">Avalanche (AVAX)</option>
-          <option value="dogecoin">Dogecoin (DOGE)</option>
-          <option value="polkadot">Polkadot (DOT)</option>
-          <option value="chainlink">Chainlink (LINK)</option>
-          <option value="sui">Sui (SUI)</option>
-        </datalist>
+        
+        <div class="search-container">
+          <input type="text" id="coinSearch" placeholder="Coin suchen (z.B. Kaspa, Bitcoin)..." autocomplete="off" oninput="searchCoins()">
+          <input type="hidden" id="selectedCoinId">
+          <div id="searchResults" class="search-results"></div>
+        </div>
 
         <input type="number" step="any" id="amount" placeholder="Menge (z.B. 0.0063)">
         <input type="number" step="any" id="totalBuyPrice" placeholder="Gesamt-Kaufpreis (z.B. 507.45 CHF)">
@@ -105,18 +104,74 @@
 
     document.getElementById('buyDate').valueAsDate = new Date();
 
+    let searchTimeout = null;
+
+    // Dynamische Live-Suche über CoinGecko API
+    function searchCoins() {
+      const query = document.getElementById('coinSearch').value.trim();
+      const resultsDiv = document.getElementById('searchResults');
+
+      clearTimeout(searchTimeout);
+
+      if (query.length < 2) {
+        resultsDiv.style.display = 'none';
+        return;
+      }
+
+      // Verzögerung (Debounce), um API-Anfragen zu begrenzen
+      searchTimeout = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          
+          resultsDiv.innerHTML = '';
+          if (data.coins && data.coins.length > 0) {
+            data.coins.slice(0, 8).forEach(coin => {
+              const item = document.createElement('div');
+              item.className = 'search-item';
+              item.innerHTML = `<span><b>${coin.name}</b></span> <span class="symbol">${coin.symbol.toUpperCase()} (${coin.id})</span>`;
+              item.onclick = () => selectCoin(coin.id, coin.name, coin.symbol);
+              resultsDiv.appendChild(item);
+            });
+            resultsDiv.style.display = 'block';
+          } else {
+            resultsDiv.style.display = 'none';
+          }
+        } catch (e) {
+          console.error("Fehler bei der Live-Suche:", e);
+        }
+      }, 300);
+    }
+
+    function selectCoin(id, name, symbol) {
+      document.getElementById('coinSearch').value = `${name} (${symbol.toUpperCase()})`;
+      document.getElementById('selectedCoinId').value = id;
+      document.getElementById('searchResults').style.display = 'none';
+    }
+
+    // Klick außerhalb schließt die Suchergebnisse
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-container')) {
+        document.getElementById('searchResults').style.display = 'none';
+      }
+    });
+
     async function addAsset() {
-      const coin_id = document.getElementById('coinId').value.toLowerCase().trim();
+      // Wenn eine Option gewählt wurde, nimm die ID, sonst die direkte Manuelleingabe
+      let coin_id = document.getElementById('selectedCoinId').value;
+      if (!coin_id) {
+        coin_id = document.getElementById('coinSearch').value.toLowerCase().trim();
+      }
+
       const amount = parseFloat(document.getElementById('amount').value);
       const total_buy_price = parseFloat(document.getElementById('totalBuyPrice').value);
       const buy_date = document.getElementById('buyDate').value;
 
       if (!coin_id || isNaN(amount) || isNaN(total_buy_price) || !buy_date) {
-        alert('Bitte alle Felder korrekt ausfüllen.');
+        alert('Bitte wähle einen Coin aus und fülle alle Felder korrekt aus.');
         return;
       }
 
-      // Rechnerischer Einzelpreis pro Coin für Abwärtskompatibilität
       const buy_price = total_buy_price / amount;
 
       const { error } = await _supabase
@@ -127,7 +182,8 @@
         console.error("Fehler beim Speichern:", error);
         alert("Fehler beim Speichern in Supabase.");
       } else {
-        document.getElementById('coinId').value = '';
+        document.getElementById('coinSearch').value = '';
+        document.getElementById('selectedCoinId').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('totalBuyPrice').value = '';
         document.getElementById('buyDate').valueAsDate = new Date();
@@ -187,7 +243,6 @@
       portfolio.forEach((item) => {
         const currentPrice = prices[item.coin_id]?.chf || 0;
         
-        // Gesamtinvestition ermitteln (fällt auf den alten Wert zurück, falls total_buy_price noch leer war)
         const investedTotal = item.total_buy_price ? parseFloat(item.total_buy_price) : (item.buy_price * item.amount);
         const buyPricePerCoin = item.amount > 0 ? (investedTotal / item.amount) : 0;
         
