@@ -387,8 +387,8 @@
             <td><b>${asset.coin_id.toUpperCase()}</b></td>
             <td>${asset.amount}</td>
             <td>${asset.investedTotal.toFixed(2)} CHF</td>
-            <td>${asset.avgBuyPrice.toFixed(2)} CHF</td>
-            <td>${asset.currentPrice ? asset.currentPrice.toFixed(2) + ' CHF' : 'N/A'}</td>
+            <td>${asset.avgBuyPrice.toFixed(4)} CHF</td>
+            <td>${asset.currentPrice ? asset.currentPrice.toFixed(4) + ' CHF' : 'N/A'}</td>
             <td><b>${asset.currentValue.toFixed(2)} CHF</b></td>
             <td class="${asset.profitLoss >= 0 ? 'positive' : 'negative'}">
               ${asset.profitLoss >= 0 ? '+' : ''}${asset.profitLoss.toFixed(2)} CHF (${asset.profitLossPercent.toFixed(2)}%)
